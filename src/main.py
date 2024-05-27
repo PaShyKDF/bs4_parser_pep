@@ -1,6 +1,7 @@
 import logging
 import re
 from urllib.parse import urljoin
+from collections import defaultdict
 
 import requests_cache
 from bs4 import BeautifulSoup
@@ -41,8 +42,9 @@ def whats_new(session):
 
 
 def latest_versions(session):
-    response = session.get(MAIN_DOC_URL)
-    response.encoding = 'utf-8'
+    response = get_response(session, MAIN_DOC_URL)
+    if response is None:
+        return
     soup = BeautifulSoup(response.text, 'lxml')
     sidebar = find_tag(soup, 'div', attrs={'class': 'sphinxsidebarwrapper'})
     ul_tags = sidebar.find_all('ul')
@@ -70,9 +72,11 @@ def latest_versions(session):
 def download(session):
 
     downloads_url = urljoin(MAIN_DOC_URL, 'download.html')
-    response = session.get(downloads_url)
+    response = get_response(session, downloads_url)
+    if response is None:
+        return
     soup = BeautifulSoup(response.text, 'lxml')
-    table_tag = soup.find(class_='docutils')
+    table_tag = find_tag(soup, 'table', attrs={'class': 'docutils'})
     pdf_a4_tag = find_tag(
         table_tag, 'a', attrs={'href': re.compile(r'.+pdf-a4\.zip$')}
     )
@@ -96,10 +100,12 @@ def download(session):
 def pep(session):
     configure_logging()
     response = get_response(session, MAIN_PEP_URL)
-    response.encoding = 'utf-8'
+    if response is None:
+        return
     soup = BeautifulSoup(response.text, features='lxml')
-    count_of_pep_in_status = {}
-    total_count_of_PEP = 0
+    count_of_pep_in_status = defaultdict(int)
+    total_count_of_pep = 0
+    warnings = []
     section_tag = find_tag(soup, 'section', attrs={'id': 'numerical-index'})
     tbody_tag = find_tag(section_tag, 'tbody')
     rows = tbody_tag.find_all('tr')
@@ -109,31 +115,30 @@ def pep(session):
             status_in_table = type_and_status_in_tabel[1]
         else:
             status_in_table = ''
-        PEP_page_link = find_tag(
+        pep_page_link = find_tag(
             row, 'a', attrs={'class': 'pep reference internal'}
         ).get('href')
-        PEP_page_url = urljoin(MAIN_PEP_URL, PEP_page_link)
-        PEP_page_response = get_response(session, PEP_page_url)
-        soup = BeautifulSoup(PEP_page_response.text, features='lxml')
-        PEP_info = find_tag(soup, 'section', attrs={'id': 'pep-content'})
-        for dt in PEP_info.find_all('dt'):
+        pep_page_url = urljoin(MAIN_PEP_URL, pep_page_link)
+        pep_page_response = get_response(session, pep_page_url)
+        if response is None:
+            return
+        soup = BeautifulSoup(pep_page_response.text, features='lxml')
+        pep_info = find_tag(soup, 'section', attrs={'id': 'pep-content'})
+        for dt in pep_info.find_all('dt'):
             if dt.text == 'Status:':
                 status_in_page = dt.find_next_sibling().text
                 break
         if status_in_page not in EXPECTED_STATUS[status_in_table]:
-            logging.warning(f'{PEP_page_url}\n'
+            warnings.append(f'{pep_page_url}\n'
                             f'Статус в карточке: {status_in_page}\n'
                             'Ожидаемые статусы: '
                             f'{EXPECTED_STATUS[status_in_table]}')
-        if status_in_page in count_of_pep_in_status:
-            count_of_pep_in_status[status_in_page] += 1
-        else:
-            count_of_pep_in_status[status_in_page] = 1
-        total_count_of_PEP += 1
+        count_of_pep_in_status[status_in_page] += 1
+        total_count_of_pep += 1
+    logging.warning('\n'.join(warnings))
     result = [('Status', 'Count')]
-    for status, count in count_of_pep_in_status.items():
-        result.append((status, count))
-    result.append(('Total', total_count_of_PEP))
+    result.extend(count_of_pep_in_status.items())
+    result.append(('Total', total_count_of_pep))
     return result
 
 

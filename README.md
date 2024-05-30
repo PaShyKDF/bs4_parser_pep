@@ -1,11 +1,12 @@
 # Парсер документации Python и PEP
 # Описание
 Парсер документации Python и PEP с помощью библиотеки BeautifulSoup4
-# Технологии
+# Стек:
 - Python 3.12
 - BeautifulSoup4
 - request-cached
 - tqdm
+<img src="https://img.shields.io/badge/Python-3776ab?style=for-the-badge&logo=python&logoColor=yellow"/> <img src="https://img.shields.io/badge/BeautifulSoup4-F0E68C?style=for-the-badge&"/> <img src="https://img.shields.io/badge/request--cached-9ACD32?style=for-the-badge&"/> <img src="https://img.shields.io/badge/tqdm-FF6347?style=for-the-badge&"/>
 # Установка
 Клонировать репозиторий и перейти в него в командной строке:
 ```
